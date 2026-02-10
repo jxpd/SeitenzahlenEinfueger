@@ -37,10 +37,13 @@ def add_page_numbers(input_path: str, output_path: str):
     # Abstände vom Rand (in Points) - näher am Heftrand
     margin_x = 20
     margin_y = 25
+
+    # Seite Startet mit
+    start_page_number = 77
     
     for page_num in range(total_pages):
         page = doc[page_num]
-        display_num = page_num + 1
+        display_num = page_num + start_page_number
         is_front = (display_num % 2 == 1)
         side = "Vorderseite" if is_front else "Rückseite"
         position = "links" if is_front else "rechts"
