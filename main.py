@@ -8,16 +8,32 @@ Rückseite (gerade Seiten): Seitenzahl rechts oben (innen)
 Die Seitenzahlen werden als FreeText-Annotation eingefügt, damit sie
 ÜBER eventuellen Stamp/Ink-Annotations liegen.
 
+Zusätzlich wird standardmäßig eine drucksichere Version erzeugt, in der
+die Annotationen eingebrannt sind (flatten / bake).
+
 Verwendung:
     pip install pymupdf
-    python main.py input.pdf output.pdf
+    python main.py input.pdf [output.pdf]
 """
 
+import argparse
 import sys
 import fitz  # PyMuPDF
 
 
-def add_page_numbers(input_path: str, output_path: str):
+def default_numbered_output_path(input_path: str) -> str:
+    if input_path.lower().endswith(".pdf"):
+        return input_path[:-4] + "_nummeriert.pdf"
+    return input_path + "_nummeriert.pdf"
+
+
+def default_print_safe_output_path(numbered_output_path: str) -> str:
+    if numbered_output_path.lower().endswith(".pdf"):
+        return numbered_output_path[:-4] + "_drucksicher.pdf"
+    return numbered_output_path + "_drucksicher.pdf"
+
+
+def add_page_numbers(input_path: str, output_path: str, start_page_number: int):
     """
     Fügt Seitenzahlen als FreeText-Annotations hinzu.
     """
@@ -38,9 +54,6 @@ def add_page_numbers(input_path: str, output_path: str):
     margin_x = 20
     margin_y = 25
 
-    # Seite Startet mit
-    start_page_number = 77
-    
     for page_num in range(total_pages):
         page = doc[page_num]
         display_num = page_num + start_page_number
@@ -108,24 +121,83 @@ def add_page_numbers(input_path: str, output_path: str):
     print(f"✓ Fertig! Ausgabe: {output_path}\n")
 
 
+def create_print_safe_pdf(source_pdf: str, output_pdf: str):
+    """
+    Erzeugt eine drucksichere Version, indem Annotationen eingebrannt werden.
+    """
+    if not hasattr(fitz.Document, "bake"):
+        raise RuntimeError(
+            "Die installierte PyMuPDF-Version unterstützt 'doc.bake()' nicht."
+        )
+
+    print("Erzeuge drucksichere Version (Annotationen werden eingebrannt)...")
+    doc = fitz.open(source_pdf)
+    try:
+        doc.bake(annots=True, widgets=False)
+        doc.save(output_pdf, garbage=4, deflate=True)
+    finally:
+        doc.close()
+    print(f"✓ Drucksichere Ausgabe: {output_pdf}\n")
+
+
 def main():
-    if len(sys.argv) < 2:
-        print("Verwendung: python main.py <input.pdf> [output.pdf]")
-        print("\nBeispiel:")
-        print("  python main.py skript.pdf skript_mit_seitenzahlen.pdf")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Fügt Seitenzahlen als Annotationen hinzu und erstellt optional "
+            "eine drucksichere, eingebrannte Version."
+        )
+    )
+    parser.add_argument("input_pdf", help="Eingabe-PDF")
+    parser.add_argument(
+        "output_pdf",
+        nargs="?",
+        help="Ausgabe-PDF mit Annotationen (Standard: <input>_nummeriert.pdf)",
+    )
+    parser.add_argument(
+        "--start-page-number",
+        type=int,
+        default=77,
+        help="Startwert der Seitenzahl (Standard: 77)",
+    )
+    parser.add_argument(
+        "--no-print-safe",
+        action="store_true",
+        help="Keine zusätzliche drucksichere Ausgabe erzeugen",
+    )
+    parser.add_argument(
+        "--print-safe-output",
+        help=(
+            "Pfad für drucksichere Ausgabe "
+            "(Standard: <output>_drucksicher.pdf)"
+        ),
+    )
+
+    args = parser.parse_args()
+
+    input_path = args.input_pdf
+    output_path = args.output_pdf or default_numbered_output_path(input_path)
+
+    if args.start_page_number < 1:
+        print("Fehler: --start-page-number muss >= 1 sein.")
         sys.exit(1)
-    
-    input_path = sys.argv[1]
-    
-    if len(sys.argv) >= 3:
-        output_path = sys.argv[2]
-    else:
-        if input_path.lower().endswith(".pdf"):
-            output_path = input_path[:-4] + "_nummeriert.pdf"
-        else:
-            output_path = input_path + "_nummeriert.pdf"
-    
-    add_page_numbers(input_path, output_path)
+
+    add_page_numbers(
+        input_path=input_path,
+        output_path=output_path,
+        start_page_number=args.start_page_number,
+    )
+
+    if args.no_print_safe:
+        return
+
+    print_safe_output = (
+        args.print_safe_output or default_print_safe_output_path(output_path)
+    )
+    if print_safe_output == output_path:
+        print("Fehler: Ausgabe-PDF und drucksichere Ausgabe dürfen nicht gleich sein.")
+        sys.exit(1)
+
+    create_print_safe_pdf(output_path, print_safe_output)
 
 
 if __name__ == "__main__":
