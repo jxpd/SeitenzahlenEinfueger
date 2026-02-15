@@ -156,8 +156,8 @@ def main():
     parser.add_argument(
         "--start-page-number",
         type=int,
-        default=77,
-        help="Startwert der Seitenzahl (Standard: 77)",
+        default=1,
+        help="Startwert der Seitenzahl (Standard: 1)",
     )
     parser.add_argument(
         "--no-print-safe",
